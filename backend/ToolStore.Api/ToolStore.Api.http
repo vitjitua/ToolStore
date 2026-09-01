@@ -1,0 +1,21 @@
+@ToolStore_Api_HostAddress = http://localhost:5178
+
+### Get current allocations
+GET {{ToolStore_Api_HostAddress}}/api/tooltransactions/current
+Accept: application/json
+
+###
+
+### Book out TL-0001 - Angle Grinder
+POST {{ToolStore_Api_HostAddress}}/api/tooltransactions/bookout
+Content-Type: application/json
+
+{
+  "toolId": 1,
+  "artisanId": 1,
+  "projectId": 1,
+  "expectedReturnDate": "2026-09-03T16:00:00",
+  "issueCondition": "Good",
+  "issuedByUserId": 1,
+  "remarks": "Initial test transaction"
+}
