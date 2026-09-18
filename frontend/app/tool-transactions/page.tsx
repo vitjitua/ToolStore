@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 const API_BASE_URL = "http://localhost:5178";
 const CURRENT_USER_ID = 1;
+const TOOLS_PER_PAGE = 10;
 
 type Tool = {
   toolId: number;
@@ -79,6 +80,7 @@ export default function ToolTransactionsPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
 
@@ -250,6 +252,26 @@ export default function ToolTransactionsPage() {
     search,
     statusFilter,
   ]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(toolRows.length / TOOLS_PER_PAGE)
+  );
+
+  const paginatedToolRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * TOOLS_PER_PAGE;
+    return toolRows.slice(startIndex, startIndex + TOOLS_PER_PAGE);
+  }, [toolRows, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
 function getStatusStyle(statusName: string) {
   switch (statusName.toLowerCase()) {
@@ -662,7 +684,7 @@ return (
 
           {!loading &&
             !error &&
-            toolRows.map((row) => {
+            paginatedToolRows.map((row) => {
               const canBookOut =
                 row.statusDefinition?.canBookOut ===
                 true;
@@ -752,6 +774,47 @@ return (
                 </div>
               );
             })}
+
+          {!loading && !error && toolRows.length > 0 && (
+            <div className="flex items-center justify-between border-t border-[#d9e0e9] bg-[#fbfcfe] px-5 py-3">
+              <p className="text-[11px] text-[#65728a]">
+                Showing{" "}
+                {(currentPage - 1) * TOOLS_PER_PAGE + 1}–
+                {Math.min(currentPage * TOOLS_PER_PAGE, toolRows.length)} of{" "}
+                {toolRows.length} tools
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((page) => Math.max(1, page - 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="h-[32px] rounded-md border border-[#cfd7e3] bg-white px-3 text-[10px] font-semibold text-[#17356d] hover:bg-[#f5f7fa] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
+
+                <span className="min-w-[90px] text-center text-[11px] font-medium text-[#536784]">
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((page) =>
+                      Math.min(totalPages, page + 1)
+                    )
+                  }
+                  disabled={currentPage === totalPages}
+                  className="h-[32px] rounded-md border border-[#cfd7e3] bg-white px-3 text-[10px] font-semibold text-[#17356d] hover:bg-[#f5f7fa] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       </div>
 

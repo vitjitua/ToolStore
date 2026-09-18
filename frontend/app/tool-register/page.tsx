@@ -60,8 +60,31 @@ type CurrentAllocation = {
   remarks: string | null;
 };
 
+type ImportToolRow = {
+  assetNumber: string;
+  toolName: string;
+  category: string;
+  serialNumber: string;
+  storeLocation: string;
+};
+
+type ImportError = {
+  rowNumber: number;
+  assetNumber: string | null;
+  toolName: string | null;
+  errors: string[];
+};
+
+type ImportResult = {
+  totalRows: number;
+  importedCount: number;
+  rejectedCount: number;
+  errors: ImportError[];
+};
+
 const API_BASE_URL = "http://localhost:5178";
 const STORAGE_KEY = "toolstore-test-user-id";
+const TOOLS_PER_PAGE = 10;
 
 export default function ToolRegisterPage() {
   const [tools, setTools] = useState<Tool[]>([]);
@@ -79,6 +102,7 @@ export default function ToolRegisterPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [conditionFilter, setConditionFilter] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [showModal, setShowModal] = useState(false);
   const [editingTool, setEditingTool] = useState<Tool | null>(null);
@@ -93,6 +117,13 @@ export default function ToolRegisterPage() {
 
   const [modalError, setModalError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importRows, setImportRows] = useState<ImportToolRow[]>([]);
+  const [importFileName, setImportFileName] = useState("");
+  const [importError, setImportError] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   const canMaintainTools =
     currentRole === "Manager" || currentRole === "Admin";
@@ -234,6 +265,30 @@ export default function ToolRegisterPage() {
       return matchesSearch && matchesStatus && matchesCondition;
     });
   }, [tools, searchTerm, statusFilter, conditionFilter]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredTools.length / TOOLS_PER_PAGE)
+  );
+
+  const paginatedTools = useMemo(() => {
+    const startIndex = (currentPage - 1) * TOOLS_PER_PAGE;
+
+    return filteredTools.slice(
+      startIndex,
+      startIndex + TOOLS_PER_PAGE
+    );
+  }, [filteredTools, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, conditionFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   // ============================================================
   // MODAL
@@ -472,6 +527,225 @@ export default function ToolRegisterPage() {
   }
 
   // ============================================================
+  // IMPORT TOOLS
+  // ============================================================
+
+  function downloadImportTemplate() {
+    const templateRows = [
+      {
+        "Asset Number": "TL-0006",
+        "Tool Name": "Hydraulic Jack",
+        Category: "Lifting Equipment",
+        "Serial Number": "HJ-1001",
+        "Store Location": "Main Tool Store",
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateRows);
+
+    worksheet["!cols"] = [
+      { wch: 16 },
+      { wch: 28 },
+      { wch: 22 },
+      { wch: 20 },
+      { wch: 22 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tool Import Template");
+
+    XLSX.writeFile(workbook, "NAMDOCK_Tool_Import_Template.xlsx");
+  }
+
+  function openImportModal() {
+    setImportRows([]);
+    setImportFileName("");
+    setImportError("");
+    setImportResult(null);
+    setShowImportModal(true);
+  }
+
+  function closeImportModal() {
+    if (importing) return;
+
+    setShowImportModal(false);
+    setImportRows([]);
+    setImportFileName("");
+    setImportError("");
+    setImportResult(null);
+  }
+
+  async function handleImportFile(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    setImportError("");
+    setImportResult(null);
+    setImportRows([]);
+    setImportFileName(file.name);
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+
+      const firstSheetName = workbook.SheetNames[0];
+
+      if (!firstSheetName) {
+        throw new Error("The Excel file does not contain a worksheet.");
+      }
+
+      const worksheet = workbook.Sheets[firstSheetName];
+
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+        worksheet,
+        {
+          defval: "",
+          raw: false,
+        }
+      );
+
+      if (rawRows.length === 0) {
+        throw new Error("The Excel file does not contain any tool rows.");
+      }
+
+      const requiredColumns = [
+        "Asset Number",
+        "Tool Name",
+      ];
+
+      const firstRow = rawRows[0];
+      const columns = Object.keys(firstRow);
+
+      const missingColumns = requiredColumns.filter(
+        (column) => !columns.includes(column)
+      );
+
+      if (missingColumns.length > 0) {
+        throw new Error(
+          `Missing required column${
+            missingColumns.length === 1 ? "" : "s"
+          }: ${missingColumns.join(", ")}.`
+        );
+      }
+
+      const parsedRows: ImportToolRow[] = rawRows.map((row) => ({
+        assetNumber: String(row["Asset Number"] ?? "").trim(),
+        toolName: String(row["Tool Name"] ?? "").trim(),
+        category: String(row["Category"] ?? "").trim(),
+        serialNumber: String(row["Serial Number"] ?? "").trim(),
+        storeLocation: String(row["Store Location"] ?? "").trim(),
+      }));
+
+      setImportRows(parsedRows);
+    } catch (err) {
+      console.error(err);
+      setImportError(
+        err instanceof Error
+          ? err.message
+          : "Unable to read the Excel file."
+      );
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  function getImportRowIssues(row: ImportToolRow, index: number) {
+    const issues: string[] = [];
+
+    if (!row.assetNumber) {
+      issues.push("Asset Number required");
+    }
+
+    if (!row.toolName) {
+      issues.push("Tool Name required");
+    }
+    if (row.assetNumber) {
+      const duplicateInRegister = tools.some(
+        (tool) =>
+          tool.assetNumber.toLowerCase() ===
+          row.assetNumber.toLowerCase()
+      );
+
+      if (duplicateInRegister) {
+        issues.push("Asset already exists");
+      }
+
+      const duplicateInFile =
+        importRows.findIndex(
+          (item) =>
+            item.assetNumber.toLowerCase() ===
+            row.assetNumber.toLowerCase()
+        ) !== index;
+
+      if (duplicateInFile) {
+        issues.push("Duplicate in file");
+      }
+    }
+
+    return issues;
+  }
+
+  async function handleConfirmImport() {
+    if (!canMaintainTools) return;
+
+    if (importRows.length === 0) {
+      setImportError("Please select an Excel file first.");
+      return;
+    }
+
+    setImportError("");
+    setImportResult(null);
+
+    try {
+      setImporting(true);
+
+      const response = await fetch(`${API_BASE_URL}/api/tools/import`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          createdBy: currentUser?.displayName ?? null,
+          tools: importRows,
+        }),
+      });
+
+      if (!response.ok) {
+        const message = await getErrorMessage(
+          response,
+          "Unable to import tools."
+        );
+
+        throw new Error(message);
+      }
+
+      const result: ImportResult = await response.json();
+
+      setImportResult(result);
+
+      if (result.importedCount > 0) {
+        await loadTools();
+        setSuccessMessage(
+          `${result.importedCount} tool${
+            result.importedCount === 1 ? "" : "s"
+          } imported successfully.`
+        );
+      }
+    } catch (err) {
+      console.error(err);
+
+      setImportError(
+        err instanceof Error ? err.message : "Unable to import tools."
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  // ============================================================
   // EXPORT EXCEL
   // ============================================================
 
@@ -611,6 +885,13 @@ function getStatusStyle(statusName: string) {
 
             {canMaintainTools && (
               <div className="flex items-center gap-3">
+                <button
+                  onClick={openImportModal}
+                  className="h-[40px] rounded-lg border border-[#d4ad18] bg-[#fff8d6] px-5 text-[12px] font-semibold text-[#715c00] hover:bg-[#F5C932]"
+                >
+                  Import Tools
+                </button>
+
                 <button
                   onClick={handleExportExcel}
                   className="h-[40px] rounded-lg border border-[#cfd7e3] bg-white px-5 text-[12px] font-semibold text-[#17356d] hover:bg-[#f5f7fa]"
@@ -760,7 +1041,7 @@ function getStatusStyle(statusName: string) {
 
           {/* ROWS */}
           {!loading &&
-            filteredTools.map((tool) => (
+            paginatedTools.map((tool) => (
               <div
                 key={tool.toolId}
                 className="grid grid-cols-[0.8fr_1.25fr_1fr_1fr_0.9fr_0.9fr_1fr_0.7fr_1fr] items-center border-b border-[#edf0f4] px-5 py-3 text-[11px] last:border-b-0 hover:bg-[#fbfcfe]"
@@ -840,8 +1121,269 @@ function getStatusStyle(statusName: string) {
                 </div>
               </div>
             ))}
+
+          {!loading && filteredTools.length > 0 && (
+            <div className="flex items-center justify-between border-t border-[#d9e0e9] bg-[#fbfcfe] px-5 py-3">
+              <p className="text-[11px] text-[#65728a]">
+                Showing{" "}
+                {(currentPage - 1) * TOOLS_PER_PAGE + 1}–
+                {Math.min(
+                  currentPage * TOOLS_PER_PAGE,
+                  filteredTools.length
+                )}{" "}
+                of {filteredTools.length} tools
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((page) =>
+                      Math.max(1, page - 1)
+                    )
+                  }
+                  disabled={currentPage === 1}
+                  className="h-[32px] rounded-md border border-[#cfd7e3] bg-white px-3 text-[10px] font-semibold text-[#17356d] hover:bg-[#f5f7fa] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
+
+                <span className="min-w-[90px] text-center text-[11px] font-medium text-[#536784]">
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((page) =>
+                      Math.min(totalPages, page + 1)
+                    )
+                  }
+                  disabled={currentPage === totalPages}
+                  className="h-[32px] rounded-md border border-[#cfd7e3] bg-white px-3 text-[10px] font-semibold text-[#17356d] hover:bg-[#f5f7fa] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       </div>
+
+      {/* IMPORT TOOLS MODAL */}
+      {showImportModal && canMaintainTools && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+          <div className="w-full max-w-[980px] overflow-hidden rounded-xl bg-white shadow-2xl">
+
+            <div className="flex items-start justify-between border-b border-[#d9e0e9] px-6 py-5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#65728a]">
+                  Tool Register
+                </p>
+
+                <h2 className="mt-1 text-[20px] font-bold text-[#10204a]">
+                  Import Tools
+                </h2>
+
+                <p className="mt-1 text-[12px] text-[#65728a]">
+                  Upload an Excel file, review the tools, then confirm the import.
+                </p>
+              </div>
+
+              <button
+                onClick={closeImportModal}
+                className="text-[24px] leading-none text-[#65728a]"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="max-h-[72vh] overflow-y-auto px-6 py-5">
+              {importError && (
+                <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[12px] font-medium text-red-700">
+                  {importError}
+                </div>
+              )}
+
+              {importResult && (
+                <div
+                  className={`mb-5 rounded-lg border px-4 py-3 text-[12px] font-medium ${
+                    importResult.rejectedCount === 0
+                      ? "border-green-200 bg-green-50 text-green-700"
+                      : "border-amber-200 bg-amber-50 text-amber-800"
+                  }`}
+                >
+                  Import complete: {importResult.importedCount} imported,{" "}
+                  {importResult.rejectedCount} rejected out of{" "}
+                  {importResult.totalRows} rows.
+                </div>
+              )}
+
+              <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto]">
+                <div className="rounded-lg border border-[#d9e0e9] bg-[#fbfcfe] px-4 py-4">
+                  <p className="text-[12px] font-semibold text-[#10204a]">
+                    Excel format
+                  </p>
+
+                  <p className="mt-1 text-[11px] leading-5 text-[#65728a]">
+                    Required columns: Asset Number and Tool Name. Optional
+                    columns: Category, Serial Number and Store Location. New
+                    tools are automatically imported as Good, Available and
+                    Active.
+                  </p>
+
+                  <button
+                    onClick={downloadImportTemplate}
+                    className="mt-3 text-[11px] font-semibold text-[#17356d] underline underline-offset-2"
+                  >
+                    Download Import Template
+                  </button>
+                </div>
+
+                <label className="flex min-h-[92px] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-[#cfd7e3] bg-white px-6 text-center hover:bg-[#fbfcfe]">
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleImportFile}
+                    className="hidden"
+                  />
+
+                  <div>
+                    <p className="text-[12px] font-semibold text-[#17356d]">
+                      Choose Excel File
+                    </p>
+
+                    <p className="mt-1 max-w-[220px] truncate text-[10px] text-[#65728a]">
+                      {importFileName || "No file selected"}
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {importRows.length > 0 && (
+                <>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-[14px] font-bold text-[#10204a]">
+                        Import Preview
+                      </h3>
+
+                      <p className="mt-0.5 text-[11px] text-[#65728a]">
+                        {importRows.length} row
+                        {importRows.length === 1 ? "" : "s"} detected
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-lg border border-[#d9e0e9]">
+                    <div className="grid grid-cols-[0.6fr_1fr_1.4fr_1.1fr_1.1fr] border-b border-[#d9e0e9] bg-[#fbfcfe] px-4 py-3 text-[9px] font-bold uppercase tracking-[0.04em] text-[#364866]">
+                      <span>Row</span>
+                      <span>Asset No.</span>
+                      <span>Tool Name</span>
+                      <span>Defaults</span>
+                      <span>Validation</span>
+                    </div>
+
+                    {importRows.map((row, index) => {
+                      const issues = getImportRowIssues(row, index);
+
+                      return (
+                        <div
+                          key={`${row.assetNumber}-${index}`}
+                          className="grid grid-cols-[0.6fr_1fr_1.4fr_1.1fr_1.1fr] items-center border-b border-[#edf0f4] px-4 py-3 text-[10px] last:border-b-0"
+                        >
+                          <div className="text-[#65728a]">{index + 2}</div>
+
+                          <div className="font-semibold text-[#17213c]">
+                            {row.assetNumber || "—"}
+                          </div>
+
+                          <div className="text-[#33425f]">
+                            {row.toolName || "—"}
+                          </div>
+
+                          <div className="text-[#536784]">
+                            Good / Available
+                          </div>
+
+                          <div>
+                            {issues.length === 0 ? (
+                              <span className="inline-flex rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-[9px] font-semibold text-green-700">
+                                Ready
+                              </span>
+                            ) : (
+                              <div className="space-y-1">
+                                {issues.map((issue) => (
+                                  <div
+                                    key={issue}
+                                    className="text-[9px] font-medium text-red-700"
+                                  >
+                                    {issue}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {importResult && importResult.errors.length > 0 && (
+                <div className="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-4">
+                  <p className="text-[12px] font-semibold text-red-800">
+                    Rejected Rows
+                  </p>
+
+                  <div className="mt-3 space-y-2">
+                    {importResult.errors.map((item) => (
+                      <div
+                        key={`${item.rowNumber}-${item.assetNumber ?? ""}`}
+                        className="text-[10px] leading-5 text-red-700"
+                      >
+                        Row {item.rowNumber}
+                        {item.assetNumber ? ` (${item.assetNumber})` : ""}:{" "}
+                        {item.errors.join("; ")}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between border-t border-[#d9e0e9] bg-[#fbfcfe] px-6 py-4">
+              <button
+                onClick={downloadImportTemplate}
+                className="h-[40px] rounded-lg border border-[#cfd7e3] bg-white px-5 text-[12px] font-semibold text-[#17356d]"
+              >
+                Download Template
+              </button>
+
+              <div className="flex gap-3">
+<button
+  onClick={closeImportModal}
+  disabled={importing}
+  className="h-[40px] rounded-lg border border-[#cfd7e3] bg-white px-5 text-[12px] font-semibold text-[#33425f]"
+>
+  {importResult ? "Done" : "Close"}
+</button>
+
+{!importResult && (
+  <button
+    onClick={handleConfirmImport}
+    disabled={importing || importRows.length === 0}
+    className="h-[40px] rounded-lg bg-[#08285a] px-5 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    {importing ? "Importing..." : "Confirm Import"}
+  </button>
+)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ADD / EDIT TOOL MODAL */}
       {showModal && canMaintainTools && (
