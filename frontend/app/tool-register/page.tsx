@@ -82,7 +82,7 @@ type ImportResult = {
   errors: ImportError[];
 };
 
-const API_BASE_URL = "http://localhost:5178";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 const TOOLS_PER_PAGE = 10;
 
 export default function ToolRegisterPage() {

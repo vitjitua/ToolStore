@@ -1,5 +1,7 @@
 "use client";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -74,9 +76,9 @@ export default function Home() {
           allocationsResponse,
           recentResponse,
         ] = await Promise.all([
-          fetch("http://localhost:5178/api/tools", { credentials: "include" }),
-          fetch("http://localhost:5178/api/tooltransactions/current", { credentials: "include" }),
-          fetch("http://localhost:5178/api/tooltransactions/recent", { credentials: "include" }),
+          fetch(`${API_BASE_URL}/api/tools`, { credentials: "include" }),
+          fetch(`${API_BASE_URL}/api/tooltransactions/current`, { credentials: "include" }),
+          fetch(`${API_BASE_URL}/api/tooltransactions/recent`, { credentials: "include" }),
         ]);
 
         if (
@@ -515,3 +517,5 @@ function MetricCard({
     </div>
   );
 }
+
+

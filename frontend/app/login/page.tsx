@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const API_BASE_URL = "http://localhost:5178";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -162,3 +162,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

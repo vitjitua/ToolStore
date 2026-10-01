@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-const API_BASE_URL = "http://localhost:5178";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 const CURRENT_USER_ID = 1;
 const TOOLS_PER_PAGE = 10;
 

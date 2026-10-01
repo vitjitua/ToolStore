@@ -19,7 +19,7 @@ type AuthenticatedUser = {
   isActive: boolean;
 };
 
-const API_BASE_URL = "http://localhost:5178";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
@@ -322,3 +322,4 @@ export default function AppShell({ children }: AppShellProps) {
     </div>
   );
 }
+
