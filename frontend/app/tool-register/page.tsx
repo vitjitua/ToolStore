@@ -83,7 +83,6 @@ type ImportResult = {
 };
 
 const API_BASE_URL = "http://localhost:5178";
-const STORAGE_KEY = "toolstore-test-user-id";
 const TOOLS_PER_PAGE = 10;
 
 export default function ToolRegisterPage() {
@@ -129,36 +128,28 @@ export default function ToolRegisterPage() {
     currentRole === "Manager" || currentRole === "Admin";
 
   // ============================================================
-  // LOAD CURRENT TEST USER
+  // LOAD AUTHENTICATED USER
   // ============================================================
 
   useEffect(() => {
     async function loadCurrentUser() {
       try {
-        const storedUserId = localStorage.getItem(STORAGE_KEY);
-
-        if (!storedUserId) {
-          return;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/api/users`);
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          credentials: "include",
+          cache: "no-store",
+        });
 
         if (!response.ok) {
-          throw new Error("Unable to load current test user.");
+          throw new Error("Unable to load authenticated user.");
         }
 
-        const activeUsers: ActiveUser[] = await response.json();
-
-        const selectedUser = activeUsers.find(
-          (user) => user.userId === Number(storedUserId)
-        );
-
-        if (selectedUser) {
-          setCurrentUser(selectedUser);
-          setCurrentRole(selectedUser.role);
-        }
+        const authenticatedUser: ActiveUser = await response.json();
+        setCurrentUser(authenticatedUser);
+        setCurrentRole(authenticatedUser.role);
       } catch (err) {
         console.error(err);
+        setCurrentUser(null);
+        setCurrentRole(null);
       }
     }
 
@@ -174,7 +165,7 @@ export default function ToolRegisterPage() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(`${API_BASE_URL}/api/tools`);
+      const response = await fetch(`${API_BASE_URL}/api/tools`, { credentials: "include" });
 
       if (!response.ok) {
         throw new Error("Unable to load tools.");
@@ -193,7 +184,8 @@ export default function ToolRegisterPage() {
   async function loadAllocations() {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/tooltransactions/current`
+        `${API_BASE_URL}/api/tooltransactions/current`,
+        { credentials: "include" }
       );
 
       if (!response.ok) {
@@ -211,8 +203,8 @@ export default function ToolRegisterPage() {
   async function loadMasterData() {
     try {
       const [conditionsResponse, statusesResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/masterdata/conditions`),
-        fetch(`${API_BASE_URL}/api/masterdata/statuses`),
+        fetch(`${API_BASE_URL}/api/masterdata/conditions`, { credentials: "include" }),
+        fetch(`${API_BASE_URL}/api/masterdata/statuses`, { credentials: "include" }),
       ]);
 
       if (!conditionsResponse.ok || !statusesResponse.ok) {
@@ -418,6 +410,7 @@ export default function ToolRegisterPage() {
 
       const response = await fetch(url, {
         method: isEditing ? "PUT" : "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -490,6 +483,7 @@ export default function ToolRegisterPage() {
         `${API_BASE_URL}/api/tools/${tool.toolId}/active`,
         {
           method: "PATCH",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },
@@ -704,6 +698,7 @@ export default function ToolRegisterPage() {
 
       const response = await fetch(`${API_BASE_URL}/api/tools/import`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },

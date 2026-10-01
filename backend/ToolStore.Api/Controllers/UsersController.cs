@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ToolStore.Api.Data;
@@ -7,9 +9,11 @@ namespace ToolStore.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "Admin")]
 public class UsersController : ControllerBase
 {
     private readonly EquipmentStoreContext _context;
+    private readonly IPasswordHasher<User> _passwordHasher;
 
     private static readonly string[] AllowedRoles =
     {
@@ -18,9 +22,13 @@ public class UsersController : ControllerBase
         "Admin"
     };
 
-    public UsersController(EquipmentStoreContext context)
+    public UsersController(
+        EquipmentStoreContext context,
+        IPasswordHasher<User> passwordHasher
+    )
     {
         _context = context;
+        _passwordHasher = passwordHasher;
     }
 
     // ============================================================
@@ -48,7 +56,6 @@ public class UsersController : ControllerBase
         return Ok(users);
     }
 
-
     // ============================================================
     // ALL USERS
     // Used by Administration
@@ -75,7 +82,6 @@ public class UsersController : ControllerBase
         return Ok(users);
     }
 
-
     // ============================================================
     // CREATE USER
     // ============================================================
@@ -89,6 +95,7 @@ public class UsersController : ControllerBase
         var displayName = request.DisplayName?.Trim();
         var emailAddress = request.EmailAddress?.Trim();
         var role = NormaliseRole(request.Role);
+        var password = request.Password;
 
         if (string.IsNullOrWhiteSpace(employeeNumber))
         {
@@ -110,6 +117,16 @@ public class UsersController : ControllerBase
             return BadRequest(
                 "Role must be Storeman, Manager or Admin."
             );
+        }
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            return BadRequest("Password is required.");
+        }
+
+        if (password.Length < 8)
+        {
+            return BadRequest("Password must be at least 8 characters.");
         }
 
         var duplicateEmployeeNumber = await _context.Users
@@ -149,8 +166,9 @@ public class UsersController : ControllerBase
             CreatedDate = DateTime.Now
         };
 
-        _context.Users.Add(user);
+        user.PasswordHash = _passwordHasher.HashPassword(user, password);
 
+        _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
         return Ok(new
@@ -164,7 +182,6 @@ public class UsersController : ControllerBase
             user.CreatedDate
         });
     }
-
 
     // ============================================================
     // UPDATE USER
@@ -259,7 +276,6 @@ public class UsersController : ControllerBase
         });
     }
 
-
     // ============================================================
     // ACTIVATE / DEACTIVATE USER
     // ============================================================
@@ -279,7 +295,6 @@ public class UsersController : ControllerBase
         }
 
         user.IsActive = request.IsActive;
-
         await _context.SaveChangesAsync();
 
         return Ok(new
@@ -294,6 +309,46 @@ public class UsersController : ControllerBase
         });
     }
 
+    // ============================================================
+    // RESET PASSWORD
+    // ============================================================
+
+    [HttpPut("{id:int}/password")]
+    public async Task<IActionResult> ResetPassword(
+        int id,
+        [FromBody] ResetUserPasswordRequest request
+    )
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.UserId == id);
+
+        if (user == null)
+        {
+            return NotFound("User not found.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Password))
+        {
+            return BadRequest("Password is required.");
+        }
+
+        if (request.Password.Length < 8)
+        {
+            return BadRequest("Password must be at least 8 characters.");
+        }
+
+        user.PasswordHash = _passwordHasher.HashPassword(
+            user,
+            request.Password
+        );
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Password reset successfully."
+        });
+    }
 
     // ============================================================
     // ROLE VALIDATION
@@ -318,7 +373,6 @@ public class UsersController : ControllerBase
     }
 }
 
-
 // ============================================================
 // REQUEST MODELS
 // ============================================================
@@ -332,6 +386,8 @@ public class CreateUserRequest
     public string EmailAddress { get; set; } = string.Empty;
 
     public string Role { get; set; } = string.Empty;
+
+    public string Password { get; set; } = string.Empty;
 }
 
 public class UpdateUserRequest
@@ -348,4 +404,9 @@ public class UpdateUserRequest
 public class SetUserActiveRequest
 {
     public bool IsActive { get; set; }
+}
+
+public class ResetUserPasswordRequest
+{
+    public string Password { get; set; } = string.Empty;
 }

@@ -133,12 +133,12 @@ export default function ToolTransactionsPage() {
         statusesResponse,
         conditionsResponse,
       ] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/tools`),
-        fetch(`${API_BASE_URL}/api/tooltransactions/current`),
-        fetch(`${API_BASE_URL}/api/artisans`),
-        fetch(`${API_BASE_URL}/api/projects`),
-        fetch(`${API_BASE_URL}/api/masterdata/statuses`),
-        fetch(`${API_BASE_URL}/api/masterdata/conditions`),
+        fetch(`${API_BASE_URL}/api/tools`, { credentials: "include" }),
+        fetch(`${API_BASE_URL}/api/tooltransactions/current`, { credentials: "include" }),
+        fetch(`${API_BASE_URL}/api/artisans`, { credentials: "include" }),
+        fetch(`${API_BASE_URL}/api/projects`, { credentials: "include" }),
+        fetch(`${API_BASE_URL}/api/masterdata/statuses`, { credentials: "include" }),
+        fetch(`${API_BASE_URL}/api/masterdata/conditions`, { credentials: "include" }),
       ]);
 
       if (
@@ -414,6 +414,7 @@ function getStatusStyle(statusName: string) {
         `${API_BASE_URL}/api/tooltransactions/bookout`,
         {
           method: "POST",
+          credentials: "include",
 
           headers: {
             "Content-Type": "application/json",
@@ -493,6 +494,7 @@ function getStatusStyle(statusName: string) {
         `${API_BASE_URL}/api/tooltransactions/return`,
         {
           method: "POST",
+          credentials: "include",
 
           headers: {
             "Content-Type": "application/json",

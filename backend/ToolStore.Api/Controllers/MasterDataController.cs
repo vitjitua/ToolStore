@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ToolStore.Api.Data;
@@ -7,6 +8,7 @@ namespace ToolStore.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class MasterDataController : ControllerBase
 {
     private readonly EquipmentStoreContext _context;
@@ -46,6 +48,7 @@ public class MasterDataController : ControllerBase
     // Used by Administration
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpGet("statuses/all")]
     public async Task<IActionResult> GetAllStatuses()
     {
@@ -70,6 +73,7 @@ public class MasterDataController : ControllerBase
     // CREATE TOOL STATUS
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPost("statuses")]
     public async Task<IActionResult> CreateStatus(
         [FromBody] CreateToolStatusRequest request
@@ -122,6 +126,7 @@ public class MasterDataController : ControllerBase
     // UPDATE TOOL STATUS
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPut("statuses/{id:int}")]
     public async Task<IActionResult> UpdateStatus(
         int id,
@@ -198,6 +203,7 @@ public class MasterDataController : ControllerBase
     // ACTIVATE / DEACTIVATE TOOL STATUS
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPatch("statuses/{id:int}/active")]
     public async Task<IActionResult> SetStatusActive(
         int id,
@@ -294,6 +300,7 @@ public class MasterDataController : ControllerBase
     // Used by Administration
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpGet("conditions/all")]
     public async Task<IActionResult> GetAllConditions()
     {
@@ -324,6 +331,7 @@ public class MasterDataController : ControllerBase
     // CREATE TOOL CONDITION
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPost("conditions")]
     public async Task<IActionResult> CreateCondition(
         [FromBody] CreateToolConditionRequest request
@@ -424,6 +432,7 @@ public class MasterDataController : ControllerBase
     // UPDATE TOOL CONDITION
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPut("conditions/{id:int}")]
     public async Task<IActionResult> UpdateCondition(
         int id,
@@ -557,6 +566,7 @@ public class MasterDataController : ControllerBase
     // ACTIVATE / DEACTIVATE TOOL CONDITION
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPatch("conditions/{id:int}/active")]
     public async Task<IActionResult> SetConditionActive(
         int id,

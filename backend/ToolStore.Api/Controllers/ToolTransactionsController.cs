@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ToolStore.Api.Data;
@@ -7,6 +9,7 @@ namespace ToolStore.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class ToolTransactionsController : ControllerBase
 {
     private readonly EquipmentStoreContext _context;
@@ -232,19 +235,24 @@ public async Task<IActionResult> GetRecentActivity()
         // VALIDATE ISSUING USER
         // ========================================================
 
+        var userIdValue =
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(userIdValue, out var issuedByUserId))
+        {
+            return Unauthorized();
+        }
+
         var userExists =
             await _context.Users
                 .AnyAsync(u =>
-                    u.UserId ==
-                        request.IssuedByUserId &&
+                    u.UserId == issuedByUserId &&
                     u.IsActive
                 );
 
         if (!userExists)
         {
-            return BadRequest(
-                "The issuing user is invalid or inactive."
-            );
+            return Unauthorized();
         }
 
 
@@ -294,7 +302,7 @@ public async Task<IActionResult> GetRecentActivity()
                     issueCondition.ConditionName,
 
                 IssuedByUserId =
-                    request.IssuedByUserId,
+                    issuedByUserId,
 
                 TransactionStatus =
                     "Open",
@@ -375,19 +383,24 @@ public async Task<IActionResult> GetRecentActivity()
         // VALIDATE RETURNING USER
         // ========================================================
 
+        var userIdValue =
+            User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(userIdValue, out var returnedByUserId))
+        {
+            return Unauthorized();
+        }
+
         var userExists =
             await _context.Users
                 .AnyAsync(u =>
-                    u.UserId ==
-                        request.ReturnedByUserId &&
+                    u.UserId == returnedByUserId &&
                     u.IsActive
                 );
 
         if (!userExists)
         {
-            return BadRequest(
-                "The returning user is invalid or inactive."
-            );
+            return Unauthorized();
         }
 
 
@@ -462,7 +475,7 @@ public async Task<IActionResult> GetRecentActivity()
             returnCondition.ConditionName;
 
         transaction.ReturnedByUserId =
-            request.ReturnedByUserId;
+            returnedByUserId;
 
         transaction.TransactionStatus =
             "Returned";

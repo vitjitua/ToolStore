@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ToolStore.Api.Data;
@@ -7,6 +8,7 @@ namespace ToolStore.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class ProjectsController : ControllerBase
 {
     private readonly EquipmentStoreContext _context;
@@ -39,6 +41,7 @@ public class ProjectsController : ControllerBase
     // Used by Administration
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpGet("all")]
     public async Task<IActionResult> GetAllProjects()
     {
@@ -55,6 +58,7 @@ public class ProjectsController : ControllerBase
     // CREATE PROJECT
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPost]
     public async Task<IActionResult> CreateProject(
         [FromBody] CreateProjectRequest request
@@ -118,6 +122,7 @@ var project = new Project
     // UPDATE PROJECT
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateProject(
         int id,
@@ -187,6 +192,7 @@ var project = new Project
     // CHANGE PROJECT STATUS
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPatch("{id:int}/status")]
     public async Task<IActionResult> UpdateProjectStatus(
         int id,

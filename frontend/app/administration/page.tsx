@@ -99,8 +99,15 @@ export default function AdministrationPage() {
   const [userDisplayName, setUserDisplayName] = useState("");
   const [userEmailAddress, setUserEmailAddress] = useState("");
   const [userRole, setUserRole] = useState<"Storeman" | "Manager" | "Admin">("Storeman");
+  const [userPassword, setUserPassword] = useState("");
+  const [userConfirmPassword, setUserConfirmPassword] = useState("");
   const [userModalError, setUserModalError] = useState("");
   const [userSubmitting, setUserSubmitting] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+  const [resetPasswordError, setResetPasswordError] = useState("");
+  const [resetPasswordSubmitting, setResetPasswordSubmitting] = useState(false);
 
   const [conditions, setConditions] = useState<ToolCondition[]>([]);
   const [conditionsLoading, setConditionsLoading] = useState(true);
@@ -150,7 +157,7 @@ export default function AdministrationPage() {
       setProjectsLoading(true);
       setError("");
 
-      const response = await fetch(`${API_BASE_URL}/api/projects/all`);
+      const response = await fetch(`${API_BASE_URL}/api/projects/all`, { credentials: "include" });
 
       if (!response.ok) {
         throw new Error("Unable to load projects.");
@@ -238,6 +245,7 @@ export default function AdministrationPage() {
 
       const response = await fetch(url, {
         method: isEditing ? "PUT" : "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectNumber: trimmedNumber,
@@ -297,6 +305,7 @@ export default function AdministrationPage() {
         `${API_BASE_URL}/api/projects/${project.projectId}/status`,
         {
           method: "PATCH",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: newStatus }),
         }
@@ -342,7 +351,7 @@ export default function AdministrationPage() {
       setArtisansLoading(true);
       setError("");
 
-      const response = await fetch(`${API_BASE_URL}/api/artisans/all`);
+      const response = await fetch(`${API_BASE_URL}/api/artisans/all`, { credentials: "include" });
 
       if (!response.ok) {
         throw new Error("Unable to load artisans.");
@@ -431,6 +440,7 @@ export default function AdministrationPage() {
 
       const response = await fetch(url, {
         method: isEditing ? "PUT" : "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           employeeNumber,
@@ -489,6 +499,7 @@ export default function AdministrationPage() {
         `${API_BASE_URL}/api/artisans/${artisan.artisanId}/active`,
         {
           method: "PATCH",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ isActive: newValue }),
         }
@@ -521,7 +532,7 @@ export default function AdministrationPage() {
       setUsersLoading(true);
       setError("");
 
-      const response = await fetch(`${API_BASE_URL}/api/users/all`);
+      const response = await fetch(`${API_BASE_URL}/api/users/all`, { credentials: "include" });
 
       if (!response.ok) {
         throw new Error("Unable to load users.");
@@ -543,6 +554,8 @@ export default function AdministrationPage() {
     setUserDisplayName("");
     setUserEmailAddress("");
     setUserRole("Storeman");
+    setUserPassword("");
+    setUserConfirmPassword("");
     setUserModalError("");
     setSuccessMessage("");
     setShowUserModal(true);
@@ -554,6 +567,8 @@ export default function AdministrationPage() {
     setUserDisplayName(user.displayName);
     setUserEmailAddress(user.emailAddress);
     setUserRole(user.role);
+    setUserPassword("");
+    setUserConfirmPassword("");
     setUserModalError("");
     setSuccessMessage("");
     setShowUserModal(true);
@@ -568,6 +583,8 @@ export default function AdministrationPage() {
     setUserDisplayName("");
     setUserEmailAddress("");
     setUserRole("Storeman");
+    setUserPassword("");
+    setUserConfirmPassword("");
     setUserModalError("");
   }
 
@@ -594,6 +611,23 @@ export default function AdministrationPage() {
       return;
     }
 
+    if (!editingUser) {
+      if (!userPassword) {
+        setUserModalError("Please enter a password.");
+        return;
+      }
+
+      if (userPassword.length < 8) {
+        setUserModalError("Password must be at least 8 characters.");
+        return;
+      }
+
+      if (userPassword !== userConfirmPassword) {
+        setUserModalError("Passwords do not match.");
+        return;
+      }
+    }
+
     try {
       setUserSubmitting(true);
 
@@ -604,12 +638,14 @@ export default function AdministrationPage() {
 
       const response = await fetch(url, {
         method: isEditing ? "PUT" : "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           employeeNumber,
           displayName,
           emailAddress,
           role: userRole,
+          ...(!isEditing ? { password: userPassword } : {}),
         }),
       });
 
@@ -662,6 +698,7 @@ export default function AdministrationPage() {
         `${API_BASE_URL}/api/users/${user.userId}/active`,
         {
           method: "PATCH",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ isActive: newValue }),
         }
@@ -689,11 +726,87 @@ export default function AdministrationPage() {
     }
   }
 
+  function openResetPasswordModal(user: User) {
+    setResetPasswordUser(user);
+    setResetPassword("");
+    setResetConfirmPassword("");
+    setResetPasswordError("");
+    setSuccessMessage("");
+  }
+
+  function closeResetPasswordModal() {
+    if (resetPasswordSubmitting) return;
+
+    setResetPasswordUser(null);
+    setResetPassword("");
+    setResetConfirmPassword("");
+    setResetPasswordError("");
+  }
+
+  async function handleResetPassword() {
+    if (!resetPasswordUser) return;
+
+    setResetPasswordError("");
+    setSuccessMessage("");
+
+    if (!resetPassword) {
+      setResetPasswordError("Please enter a new password.");
+      return;
+    }
+
+    if (resetPassword.length < 8) {
+      setResetPasswordError("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (resetPassword !== resetConfirmPassword) {
+      setResetPasswordError("Passwords do not match.");
+      return;
+    }
+
+    try {
+      setResetPasswordSubmitting(true);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/users/${resetPasswordUser.userId}/password`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ password: resetPassword }),
+        }
+      );
+
+      if (!response.ok) {
+        const message = await getErrorMessage(
+          response,
+          "Unable to reset password."
+        );
+        throw new Error(message);
+      }
+
+      const displayName = resetPasswordUser.displayName;
+      closeResetPasswordModal();
+      setResetPasswordUser(null);
+      setResetPassword("");
+      setResetConfirmPassword("");
+      setResetPasswordError("");
+      setSuccessMessage(`Password for ${displayName} was reset successfully.`);
+    } catch (err) {
+      console.error(err);
+      setResetPasswordError(
+        err instanceof Error ? err.message : "Unable to reset password."
+      );
+    } finally {
+      setResetPasswordSubmitting(false);
+    }
+  }
+
   async function loadConditions() {
     try {
       setConditionsLoading(true);
       setError("");
-      const response = await fetch(`${API_BASE_URL}/api/masterdata/conditions/all`);
+      const response = await fetch(`${API_BASE_URL}/api/masterdata/conditions/all`, { credentials: "include" });
       if (!response.ok) throw new Error("Unable to load tool conditions.");
       const data: ToolCondition[] = await response.json();
       setConditions(data);
@@ -758,6 +871,7 @@ export default function AdministrationPage() {
         : `${API_BASE_URL}/api/masterdata/conditions`;
       const response = await fetch(url, {
         method: isEditing ? "PUT" : "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conditionName: trimmedName,
@@ -791,6 +905,7 @@ export default function AdministrationPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/masterdata/conditions/${condition.conditionId}/active`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: newValue }),
       });
@@ -812,7 +927,8 @@ export default function AdministrationPage() {
       setError("");
 
       const response = await fetch(
-        `${API_BASE_URL}/api/masterdata/statuses/all`
+        `${API_BASE_URL}/api/masterdata/statuses/all`,
+        { credentials: "include" }
       );
 
       if (!response.ok) {
@@ -839,25 +955,17 @@ export default function AdministrationPage() {
   useEffect(() => {
     async function loadCurrentRole() {
       try {
-        const storedUserId = localStorage.getItem("toolstore-test-user-id");
-
-        if (!storedUserId) {
-          setCurrentRole(null);
-          return;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/api/users`);
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          credentials: "include",
+          cache: "no-store",
+        });
 
         if (!response.ok) {
-          throw new Error("Unable to load current test user.");
+          throw new Error("Unable to load authenticated user.");
         }
 
-        const activeUsers: User[] = await response.json();
-        const selectedUser = activeUsers.find(
-          (user) => user.userId === Number(storedUserId)
-        );
-
-        setCurrentRole(selectedUser?.role ?? null);
+        const authenticatedUser: User = await response.json();
+        setCurrentRole(authenticatedUser.role);
       } catch (err) {
         console.error(err);
         setCurrentRole(null);
@@ -973,6 +1081,7 @@ export default function AdministrationPage() {
 
       const response = await fetch(url, {
         method,
+        credentials: "include",
 
         headers: {
           "Content-Type":
@@ -1046,6 +1155,7 @@ export default function AdministrationPage() {
         `${API_BASE_URL}/api/masterdata/statuses/${status.statusId}/active`,
         {
           method: "PATCH",
+          credentials: "include",
 
           headers: {
             "Content-Type":
@@ -1391,7 +1501,7 @@ export default function AdministrationPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-[0.85fr_1.25fr_1.6fr_0.8fr_0.8fr_1fr] border-b border-[#d9e0e9] bg-[#fbfcfe] px-5 py-3 text-[9px] font-bold uppercase tracking-[0.05em] text-[#364866]">
+              <div className="grid grid-cols-[0.85fr_1.25fr_1.6fr_0.8fr_0.8fr_1.5fr] border-b border-[#d9e0e9] bg-[#fbfcfe] px-5 py-3 text-[9px] font-bold uppercase tracking-[0.05em] text-[#364866]">
                 <span>Staff Number</span>
                 <span>Name</span>
                 <span>Email Address</span>
@@ -1421,7 +1531,7 @@ export default function AdministrationPage() {
                 users.map((user) => (
                   <div
                     key={user.userId}
-                    className="grid grid-cols-[0.85fr_1.25fr_1.6fr_0.8fr_0.8fr_1fr] items-center border-b border-[#edf0f4] px-5 py-3 text-[11px] last:border-b-0 hover:bg-[#fbfcfe]"
+                    className="grid grid-cols-[0.85fr_1.25fr_1.6fr_0.8fr_0.8fr_1.5fr] items-center border-b border-[#edf0f4] px-5 py-3 text-[11px] last:border-b-0 hover:bg-[#fbfcfe]"
                   >
                     <div className="font-semibold text-[#17213c]">
                       {user.employeeNumber || "—"}
@@ -1450,6 +1560,12 @@ export default function AdministrationPage() {
                         className="h-[30px] rounded-md border border-[#cfd7e3] bg-white px-3 text-[10px] font-semibold text-[#17356d] hover:bg-[#f5f7fa]"
                       >
                         Edit
+                      </button>
+                      <button
+                        onClick={() => openResetPasswordModal(user)}
+                        className="h-[30px] rounded-md border border-[#cfd7e3] bg-white px-3 text-[10px] font-semibold text-[#17356d] hover:bg-[#f5f7fa]"
+                      >
+                        Reset Password
                       </button>
                       <button
                         onClick={() => handleUserActive(user)}
@@ -1997,6 +2113,38 @@ export default function AdministrationPage() {
                 </select>
               </div>
 
+              {!editingUser && (
+                <div className="grid grid-cols-2 gap-4">
+                  <label className="block">
+                    <span className="mb-1.5 block text-[11px] font-semibold text-[#33425f]">
+                      Password *
+                    </span>
+                    <input
+                      type="password"
+                      value={userPassword}
+                      onChange={(e) => setUserPassword(e.target.value)}
+                      autoComplete="new-password"
+                      className="h-[40px] w-full rounded-lg border border-[#cfd7e3] px-3 text-[12px] text-[#17213c] outline-none focus:border-[#08285a]"
+                      placeholder="Minimum 8 characters"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-[11px] font-semibold text-[#33425f]">
+                      Confirm Password *
+                    </span>
+                    <input
+                      type="password"
+                      value={userConfirmPassword}
+                      onChange={(e) => setUserConfirmPassword(e.target.value)}
+                      autoComplete="new-password"
+                      className="h-[40px] w-full rounded-lg border border-[#cfd7e3] px-3 text-[12px] text-[#17213c] outline-none focus:border-[#08285a]"
+                      placeholder="Re-enter password"
+                    />
+                  </label>
+                </div>
+              )}
+
               <div className="rounded-lg border border-[#d9e0e9] bg-[#fbfcfe] px-4 py-3 text-[11px] leading-5 text-[#65728a]">
                 <span className="font-semibold text-[#33425f]">Storeman</span>{" "}
                 has access to Tool Transactions and Tool Register.{" "}
@@ -2006,7 +2154,6 @@ export default function AdministrationPage() {
                 has full access including Users & Roles.
               </div>
             </div>
-
             <div className="flex justify-end gap-3 border-t border-[#d9e0e9] bg-[#fbfcfe] px-6 py-4">
               <button
                 onClick={closeUserModal}
@@ -2026,6 +2173,90 @@ export default function AdministrationPage() {
                   : editingUser
                     ? "Save Changes"
                     : "Add User"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RESET USER PASSWORD MODAL */}
+      {currentRole === "Admin" && resetPasswordUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+          <div className="w-full max-w-[480px] overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-[#d9e0e9] px-6 py-5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#65728a]">
+                  Administration
+                </p>
+                <h2 className="mt-1 text-[20px] font-bold text-[#10204a]">
+                  Reset Password
+                </h2>
+                <p className="mt-1 text-[12px] text-[#65728a]">
+                  Set a new password for {resetPasswordUser.displayName}.
+                </p>
+              </div>
+              <button
+                onClick={closeResetPasswordModal}
+                className="text-[24px] leading-none text-[#65728a]"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-5 px-6 py-5">
+              {resetPasswordError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[12px] font-medium text-red-700">
+                  {resetPasswordError}
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1.5 block text-[12px] font-semibold text-[#33425f]">
+                  New Password *
+                </label>
+                <input
+                  type="password"
+                  value={resetPassword}
+                  onChange={(event) => setResetPassword(event.target.value)}
+                  autoComplete="new-password"
+                  placeholder="Minimum 8 characters"
+                  className="h-[42px] w-full rounded-lg border border-[#cfd7e3] bg-white px-3 text-[13px] outline-none placeholder:text-[#8b97aa] focus:border-[#213767]"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-[12px] font-semibold text-[#33425f]">
+                  Confirm New Password *
+                </label>
+                <input
+                  type="password"
+                  value={resetConfirmPassword}
+                  onChange={(event) => setResetConfirmPassword(event.target.value)}
+                  autoComplete="new-password"
+                  placeholder="Re-enter password"
+                  className="h-[42px] w-full rounded-lg border border-[#cfd7e3] bg-white px-3 text-[13px] outline-none placeholder:text-[#8b97aa] focus:border-[#213767]"
+                />
+              </div>
+
+              <div className="rounded-lg border border-[#d9e0e9] bg-[#fbfcfe] px-4 py-3 text-[11px] leading-5 text-[#65728a]">
+                The new password must contain at least 8 characters.
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-[#d9e0e9] bg-[#fbfcfe] px-6 py-4">
+              <button
+                onClick={closeResetPasswordModal}
+                disabled={resetPasswordSubmitting}
+                className="h-[40px] rounded-lg border border-[#cfd7e3] bg-white px-5 text-[12px] font-semibold text-[#33425f]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetPassword}
+                disabled={resetPasswordSubmitting}
+                className="h-[40px] rounded-lg bg-[#08285a] px-5 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resetPasswordSubmitting ? "Resetting..." : "Reset Password"}
               </button>
             </div>
           </div>

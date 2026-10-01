@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ToolStore.Api.Data;
@@ -7,6 +8,7 @@ namespace ToolStore.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class ToolsController : ControllerBase
 {
     private readonly EquipmentStoreContext _context;
@@ -51,6 +53,7 @@ public class ToolsController : ControllerBase
     // CREATE TOOL
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPost]
     public async Task<IActionResult> CreateTool(
         [FromBody] CreateToolRequest request
@@ -175,6 +178,7 @@ public class ToolsController : ControllerBase
     // UPDATE TOOL
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateTool(
         int id,
@@ -330,6 +334,7 @@ public class ToolsController : ControllerBase
     // ACTIVATE / DEACTIVATE TOOL
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPatch("{id:int}/active")]
     public async Task<IActionResult> SetToolActive(
         int id,
@@ -385,6 +390,7 @@ public class ToolsController : ControllerBase
     // New imported tools always start as Good / Available / Active
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPost("import")]
     public async Task<IActionResult> ImportTools(
         [FromBody] ImportToolsRequest request

@@ -74,9 +74,9 @@ export default function Home() {
           allocationsResponse,
           recentResponse,
         ] = await Promise.all([
-          fetch("http://localhost:5178/api/tools"),
-          fetch("http://localhost:5178/api/tooltransactions/current"),
-          fetch("http://localhost:5178/api/tooltransactions/recent"),
+          fetch("http://localhost:5178/api/tools", { credentials: "include" }),
+          fetch("http://localhost:5178/api/tooltransactions/current", { credentials: "include" }),
+          fetch("http://localhost:5178/api/tooltransactions/recent", { credentials: "include" }),
         ]);
 
         if (

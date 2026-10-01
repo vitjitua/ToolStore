@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ToolStore.Api.Data;
@@ -7,6 +8,7 @@ namespace ToolStore.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class ArtisansController : ControllerBase
 {
     private readonly EquipmentStoreContext _context;
@@ -48,6 +50,7 @@ public class ArtisansController : ControllerBase
     // Used by Administration
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpGet("all")]
     public async Task<IActionResult> GetAllArtisans()
     {
@@ -74,6 +77,7 @@ public class ArtisansController : ControllerBase
     // CREATE ARTISAN
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPost]
     public async Task<IActionResult> CreateArtisan(
         [FromBody] CreateArtisanRequest request
@@ -149,6 +153,7 @@ public class ArtisansController : ControllerBase
     // UPDATE ARTISAN
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateArtisan(
         int id,
@@ -226,6 +231,7 @@ public class ArtisansController : ControllerBase
     // ACTIVATE / DEACTIVATE ARTISAN
     // ============================================================
 
+    [Authorize(Roles = "Manager,Admin")]
     [HttpPatch("{id:int}/active")]
     public async Task<IActionResult> SetArtisanActive(
         int id,
